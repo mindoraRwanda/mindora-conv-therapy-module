@@ -123,25 +123,12 @@ Returns context-rich response pulled from uploaded documents.
 
 ## Adding More Documents
 
-1. Add PDF files to:
-
-```
-C:/Users/STUDENT/Documents/MentalHealthChatbot
-```
-
-2. Run:
+1. Run:
 
 ```bash
 python backend/app/services/rag_service.py
 ```
 
----
-
-## LLM Configuration
-
-- **Engine:** Ollama  
-- **Model:** LLaMA 3  
-- **LangChain Integration:** True  
-- **Retriever:** Qdrant  
+ 
 
 
