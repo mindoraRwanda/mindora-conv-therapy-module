@@ -16,7 +16,8 @@ def get_llm_service():
     """Lazy initialization of the LLM service"""
     global _llm_service
     if _llm_service is None:
-        _llm_service = LLMService(model_name="llama2:13b")  
+        _llm_service = LLMService(model_name="llama3")  # this matches Ollama
+
     return _llm_service
 
 # Define the message schema
@@ -32,42 +33,34 @@ class ChatResponse(BaseModel):
 
 # Simple conversation storage
 conversation_store = {}
-
 @router.post("/chat", response_model=ChatResponse)
 async def chat(message: Message, llm_service: LLMService = Depends(get_llm_service)):
-    # Get or create a conversation ID
     conversation_id = message.conversation_id or f"conv_{datetime.now().strftime('%Y%m%d%H%M%S')}"
     
-    # Get or initialize conversation history
     conversation = conversation_store.get(conversation_id, [])
     
-    # Add user message to history
     conversation.append({
         "role": "user",
         "text": message.message,
         "timestamp": datetime.now().isoformat()
     })
     
-    # Generate response using LLM
-    response_text = llm_service.generate_response(
+    # Await the async function
+    response_text = await llm_service.generate_response(
         message.message, 
         conversation_history=conversation
     )
     
-    # Create timestamp
     timestamp = datetime.now().isoformat()
     
-    # Add bot response to history
     conversation.append({
         "role": "model",
         "text": response_text,
         "timestamp": timestamp
     })
     
-    # Store updated conversation
     conversation_store[conversation_id] = conversation
     
-    # Return response
     return ChatResponse(
         response=response_text,
         timestamp=timestamp,
