@@ -56,9 +56,9 @@ Qdrant Dashboard: [http://localhost:6333/dashboard](http://localhost:6333/dashbo
 Place your PDFs in:
 
 ```
-C:/Users/STUDENT/Documents/MentalHealthChatbot
+C:/Users/STUDENT/Documents/MentalHealthChatbot 
 ```
-
+Or if you placed them in a different file make sure you update this path
 Then run:
 
 ```bash
