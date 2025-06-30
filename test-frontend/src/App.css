@@ -1,148 +1,38 @@
-body {
-    margin: 0;
-    padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-      Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-    background-color: #f0f4f8;
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
   }
-  
-  .app-container {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    max-width: 800px;
-    margin: 0 auto;
-    background-color: white;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
   }
-  
-  .chat-header {
-    background-color: #4a0887;
-    color: white;
-    padding: 10px 20px;
-    text-align: center;
+  to {
+    transform: rotate(360deg);
   }
-  
-  .chat-header h1 {
-    margin: 0;
-    font-size: 1.5rem;
-  }
-  
-  .chat-header p {
-    margin: 5px 0 0 0;
-    font-size: 0.9rem;
-    opacity: 0.8;
-  }
-  
-  .chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .message {
-    max-width: 70%;
-    margin-bottom: 15px;
-    position: relative;
-  }
-  
-  .user-message {
-    align-self: flex-end;
-  }
-  
-  .bot-message {
-    align-self: flex-start;
-  }
-  
-  .message-content {
-    padding: 10px 15px;
-    border-radius: 18px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  }
-  
-  .user-message .message-content {
-    background-color: #4a0887;
-    color: white;
-    border-bottom-right-radius: 5px;
-  }
-  
-  .bot-message .message-content {
-    background-color: #f0f0f0;
-    color: #333;
-    border-bottom-left-radius: 5px;
-  }
-  
-  .timestamp {
-    display: block;
-    font-size: 0.7rem;
-    margin-top: 5px;
-    opacity: 0.7;
-    text-align: right;
-  }
-  
-  .input-area {
-    display: flex;
-    padding: 15px;
-    border-top: 1px solid #e0e0e0;
-  }
-  
-  .input-area input {
-    flex: 1;
-    padding: 10px 15px;
-    border: 1px solid #ddd;
-    border-radius: 20px;
-    font-size: 1rem;
-    outline: none;
-  }
-  
-  .input-area button {
-    background-color: #4a0887;
-    color: white;
-    border: none;
-    border-radius: 20px;
-    padding: 10px 20px;
-    margin-left: 10px;
-    cursor: pointer;
-  }
-  
-  .input-area button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-  
-  .loading-indicator {
-    display: flex;
-    justify-content: center;
-    align-self: flex-start;
-    margin: 10px 0;
-  }
-  
-  .dot {
-    width: 8px;
-    height: 8px;
-    background-color: #888;
-    border-radius: 50%;
-    margin: 0 3px;
-    animation: pulse 1.5s infinite ease-in-out;
-  }
-  
-  .dot:nth-child(2) {
-    animation-delay: 0.3s;
-  }
-  
-  .dot:nth-child(3) {
-    animation-delay: 0.6s;
-  }
-  
-  @keyframes pulse {
-    0%, 100% {
-      transform: scale(1);
-      opacity: 0.3;
-    }
-    50% {
-      transform: scale(1.3);
-      opacity: 1;
-    }
-  }
+}
