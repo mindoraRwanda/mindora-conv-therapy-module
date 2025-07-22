@@ -1,19 +1,19 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, constr
+from typing import Annotated, List
 from datetime import datetime
+from app.services.chatbot_insights_pipeline import analyze_user_input
 
-class MessageOut(BaseModel):
-    id: int
-    sender: str
-    content: str
-    timestamp: datetime
 
-    class Config:
-        from_attributes = True  # for Pydantic v2+ (instead of orm_mode)
+
+
+# Type-safe annotated fields
+UsernameType = Annotated[str, constr(min_length=3, max_length=20)]
+PasswordType = Annotated[str, constr(min_length=6)]
 
 class UserCreate(BaseModel):
-    username: str
+    username: UsernameType
     email: EmailStr
-    password: str
+    password: PasswordType
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -25,6 +25,26 @@ class TokenResponse(BaseModel):
 
 class MessageCreate(BaseModel):
     conversation_id: int
-    content: str  # Sender will now be set in backend
+    content: Annotated[str, constr(min_length=1)]  # Ensures message is not empty
 
-   
+class MessageOut(BaseModel):
+    id: int
+    sender: str
+    content: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True  # for Pydantic v2 (replaces orm_mode)
+
+class ConversationOut(BaseModel):
+    id: int
+    started_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class EmotionRequest(BaseModel):
+    text: str    
+        
+class AnalysisRequest(BaseModel):
+    user_input: str

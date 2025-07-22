@@ -26,12 +26,11 @@
 
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Login from './pages/Login';
+import Login from './pages/login';
 import Register from './pages/Register';
 import ChatList from './pages/ChatList';
-import Chat from './pages/Chat';
+import ChatDashboard from './pages/ChatDashboard';
 import './index.css'; // or './App.css' if that's where Tailwind is declared
-
 
 function App() {
   return (
@@ -40,7 +39,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/chats" element={<ChatList />} />
-        <Route path="/chat/:chatId" element={<Chat />} />
+        <Route path="/chat/:chatId" element={<ChatDashboard />} />
       </Routes>
     </BrowserRouter>
   );

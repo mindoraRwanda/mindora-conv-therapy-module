@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -7,28 +6,48 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      setStatus('Please enter both email and password');
-      return;
-    }
+  if (!email || !password) {
+    setStatus('Please enter both email and password');
+    return;
+  }
 
-    try {
-      const res = await axios.post('http://localhost:8000/auth/login', {
-        email,
-        password,
+  try {
+    const res = await axios.post('http://localhost:8000/auth/login', {
+      email,
+      password,
+    });
+
+    const token = res.data.access_token;
+    const username = res.data.username; // assuming returned now
+
+    localStorage.setItem('token', token);
+    localStorage.setItem('username', username);
+
+    // 👉 Now fetch latest conversation and go to it
+    const convoRes = await axios.get('http://localhost:8000/auth/conversations', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (convoRes.data.length > 0) {
+      const latest = convoRes.data[0];
+      navigate(`/chat/${latest.id}`);
+    } else {
+      // Create a new one if none exist
+      const newRes = await axios.post('http://localhost:8000/auth/conversations', {}, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      const token = res.data.access_token;
-      localStorage.setItem('token', token);
-      navigate('/chats');
-    } catch (error) {
-      console.error(error);
-      setStatus('Login failed. Please check your credentials.');
+      navigate(`/chat/${newRes.data.id}`);
     }
-  };
+  } catch (error) {
+    console.error(error);
+    setStatus('Login failed. Please check your credentials.');
+  }
+};
+
 
   return (
     <div className="login-container">
@@ -161,8 +180,8 @@ export default function Login() {
             className="input-field"
           />
 
-          <button onClick={handleLogin} className="submit-btn">
-            Sign In
+          <button onClick={handleLogin} className="submit-btn" disabled={loading}>
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
 
           <div className="options-row">
@@ -178,7 +197,7 @@ export default function Login() {
         </div>
 
         <div className="welcome-panel">
-          <h2>Welcome to login</h2>
+          <h2>Welcome back</h2>
           <p>Don’t have an account?</p>
           <a href="/register" className="signup-link">Sign Up</a>
         </div>

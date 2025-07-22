@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { register } from '../api/api';
 import { useNavigate } from 'react-router-dom';
+import { register, startNewChat } from '../api/api';
+
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -10,16 +11,27 @@ export default function Register() {
   const navigate = useNavigate();
 
   const handleRegister = async () => {
-    try {
-      const res = await register(email, username, password);
-      localStorage.setItem('token', res.data.access_token);
-      localStorage.setItem('user_id', res.data.user_id);
-      navigate('/chats');
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Registration failed. Try a different email.';
+  try {
+    const res = await register(username, email, password);
+    localStorage.setItem('token', res.data.access_token);
+    localStorage.setItem('user_id', res.data.user_id);
+
+    // Create first conversation
+    const conv = await startNewChat();
+    const convId = conv.data.id;
+
+    navigate(`/chat/${convId}`);
+  } catch (err) {
+    const issues = err.response?.data?.detail;
+    if (Array.isArray(issues)) {
+      const msg = issues.map(e => `• ${e.msg}`).join('\n');
       setError(msg);
+    } else {
+      setError('Registration failed. Try a different email.');
     }
-  };
+  }
+};
+
 
   return (
     <div className="register-container">
