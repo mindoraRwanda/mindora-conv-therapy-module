@@ -46,6 +46,7 @@ test-frontend/yarn-debug.log*
 test-frontend/yarn-error.log*
 test-frontend/dist/
 test-frontend/.cache/
+node_modules/
 
 # Editor directories and files
 .idea/
