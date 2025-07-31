@@ -533,6 +533,17 @@ export default function ChatDashboard() {
         <button className="new-chat-btn" onClick={handleNewChat}>
           + New Chat
         </button>
+        <button 
+          className="new-chat-btn" 
+          onClick={() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = '/';
+          }}
+          style={{ marginTop: '10px', background: '#dc2626' }}
+        >
+          Logout
+        </button>
         {conversations.map(chat => {
           const firstMessage = chat.messages?.find(m => m.sender === 'user')?.content;
           const label = firstMessage

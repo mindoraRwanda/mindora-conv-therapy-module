@@ -22,6 +22,8 @@ class UserLogin(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    user_id: int = None
+    username: str = None
 
 class MessageCreate(BaseModel):
     conversation_id: int

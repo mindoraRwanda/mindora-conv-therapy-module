@@ -29,6 +29,7 @@ pip-delete-this-directory.txt
 backend/data/conversations.json
 backend/logs/
 backend/models/
+backend/datasources/
 
 # React frontend
 test-frontend/node_modules/
