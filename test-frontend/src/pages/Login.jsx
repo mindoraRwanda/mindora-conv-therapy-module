@@ -15,10 +15,13 @@ export default function Login() {
     return;
   }
 
+  console.log('Sending login request:', { email, password: '***' });
+  setLoading(true);
+
   try {
     const res = await axios.post('http://localhost:8000/auth/login', {
-      email,
-      password,
+      email: email.trim(),
+      password: password.trim(),
     });
 
     const token = res.data.access_token;
@@ -43,8 +46,19 @@ export default function Login() {
       navigate(`/chat/${newRes.data.id}`);
     }
   } catch (error) {
-    console.error(error);
-    setStatus('Login failed. Please check your credentials.');
+    console.error('Login error:', error.response?.data || error.message);
+    if (error.response?.status === 422) {
+      const details = error.response.data.detail;
+      if (Array.isArray(details)) {
+        setStatus(`Validation error: ${details.map(d => d.msg).join(', ')}`);
+      } else {
+        setStatus('Please check your email format and try again.');
+      }
+    } else {
+      setStatus('Login failed. Please check your credentials.');
+    }
+  } finally {
+    setLoading(false);
   }
 };
 

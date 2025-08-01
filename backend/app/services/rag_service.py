@@ -7,7 +7,8 @@ import uuid
 import fitz  # PyMuPDF
 
 # Define the folder containing your PDF documents
-pdf_folder = Path("C:/Users/STUDENT/Documents/MentalHealthChatbot")
+# pdf_folder = Path("../../datasources")
+pdf_folder = Path("D:/Projects/mindora-conv-therapy-module/backend/datasources")
 
 # Define the name of the Qdrant collection to store document chunks
 collection_name = "therapy_knowledge_base"
