@@ -62,7 +62,7 @@ export default function Register() {
         }
 
         .brand {
-          color: #1e40af;
+          color: rgb(109, 40, 217);
           font-size: 32px;
           margin-bottom: 10px;
         }
@@ -86,13 +86,13 @@ export default function Register() {
 
         .input-field:focus {
           outline: none;
-          border-color: #2563eb;
+          border-color: rgb(109, 40, 217);
         }
 
         .submit-btn {
           width: 100%;
           padding: 12px;
-          background: linear-gradient(to right, #1d4ed8, #1e3a8a);
+          background: linear-gradient(to right, rgb(109, 40, 217), rgb(91, 33, 182));
           color: white;
           font-weight: bold;
           border: none;
@@ -102,7 +102,7 @@ export default function Register() {
         }
 
         .submit-btn:hover {
-          background: linear-gradient(to right, #1e40af, #1e3a8a);
+          background: linear-gradient(to right, rgb(91, 33, 182), rgb(79, 70, 229));
         }
 
         .error-msg {
@@ -113,7 +113,7 @@ export default function Register() {
 
         .welcome-panel {
           width: 50%;
-          background: linear-gradient(to bottom right, #1e40af, #1e3a8a);
+          background: linear-gradient(to bottom right, rgb(109, 40, 217), rgb(91, 33, 182));
           color: white;
           padding: 40px;
           display: flex;
@@ -134,7 +134,7 @@ export default function Register() {
 
         .login-link:hover {
           background-color: white;
-          color: #1e3a8a;
+          color: rgb(109, 40, 217);
         }
       `}</style>
 

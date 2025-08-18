@@ -13,9 +13,11 @@ from app.db.models import Message, Conversation
 from sqlalchemy.orm import Session
 
 class LLMService:
-    def __init__(self, model_name: str = "llama3"):
+    def __init__(self, model_name: str = "llama3", use_vllm: bool = False):
         self.model_name = model_name
+        self.use_vllm = use_vllm
         self.ollama_base_url = "http://localhost:11434"
+        self.vllm_base_url = "http://localhost:8001/v1"  # vLLM OpenAI-compatible endpoint
         self.chat_model = None
         self.retriever = RetrieverService()
         self.is_initialized = False
@@ -23,15 +25,28 @@ class LLMService:
 
     def _initialize_model(self):
         try:
-            if not self._is_ollama_running():
-                print("Ollama is not running. Please start the Ollama server.")
-                return
-            if not self._is_model_available():
-                print(f"Model '{self.model_name}' is not available. Please run: ollama pull {self.model_name}")
-                return
-            self.chat_model = ChatOllama(model=self.model_name, temperature=0.7)
-            self.is_initialized = True
-            print(f"LLM initialized with model: {self.model_name}")
+            if self.use_vllm:
+                if not self._is_vllm_running():
+                    print("vLLM is not running. Please start: docker-compose up vllm")
+                    return
+                # Use ChatOllama with vLLM's OpenAI-compatible API
+                self.chat_model = ChatOllama(
+                    base_url=self.vllm_base_url,
+                    model="meta-llama/Meta-Llama-3-8B-Instruct",
+                    temperature=0.7
+                )
+                self.is_initialized = True
+                print("LLM initialized with vLLM (Llama-3-8B-Instruct)")
+            else:
+                if not self._is_ollama_running():
+                    print("Ollama is not running. Please start the Ollama server.")
+                    return
+                if not self._is_model_available():
+                    print(f"Model '{self.model_name}' is not available. Please run: ollama pull {self.model_name}")
+                    return
+                self.chat_model = ChatOllama(model=self.model_name, temperature=0.7)
+                self.is_initialized = True
+                print(f"LLM initialized with Ollama model: {self.model_name}")
         except Exception as e:
             print(f"Error during model initialization: {e}")
 
@@ -47,6 +62,13 @@ class LLMService:
             models = requests.get(f"{self.ollama_base_url}/api/tags").json().get("models", [])
             return any(self.model_name in m.get("name", "") for m in models)
         except:
+            return False
+
+    def _is_vllm_running(self) -> bool:
+        try:
+            response = requests.get(f"{self.vllm_base_url}/models")
+            return response.status_code == 200
+        except requests.exceptions.ConnectionError:
             return False
 
     def _get_varied_intro(self, emotion: str) -> str:
@@ -113,56 +135,78 @@ Summary:
             print(f"[Summarization Error] {e}")
             return ""
 
-    async def generate_response(self, user_message: str, conversation_history: Optional[List[Dict[str, Any]]] = None, user_id: Optional[str] = None) -> str:
+    async def generate_response(self, user_message: str, conversation_history: Optional[List[Dict[str, Any]]] = None, user_id: Optional[str] = None, skip_analysis: bool = False) -> str:
+        import time
+        llm_pipeline_start = time.time()
+        
         if not self.is_initialized:
             return "Ollama not initialized."
 
-        emotion = classify_emotion(user_message)
-        suicide_flag = detect_suicide_risk(user_message)
-        meds_mentioned = detect_medication_mentions(user_message)
+        # Fast path - skip heavy analysis for simple/short messages
+        if skip_analysis or len(user_message.strip()) < 10:
+            emotion = "neutral"
+            suicide_flag = False
+            meds_mentioned = []
+            retrieved_text = ""
+            print(f"    📝 LLM: Using fast path (short message)")
+        else:
+            # Only run expensive operations for longer messages
+            analysis_start = time.time()
+            emotion = classify_emotion(user_message)
+            suicide_flag = detect_suicide_risk(user_message)
+            meds_mentioned = detect_medication_mentions(user_message)
+            analysis_time = time.time() - analysis_start
+            print(f"    📊 LLM: Analysis pipeline: {analysis_time:.3f}s")
+
+            # Skip RAG for very short messages or greetings
+            if len(user_message.strip()) < 20 or any(greeting in user_message.lower() for greeting in ['hi', 'hello', 'hey', 'good morning', 'good evening']):
+                retrieved_text = ""
+                print(f"    🚫 LLM: Skipping RAG (short/greeting)")
+            else:
+                rag_start = time.time()
+                try:
+                    retrieved_chunks = self.retriever.search(query=user_message, top_k=2)
+                    retrieved_text = "\n\n".join(chunk for chunk in retrieved_chunks if isinstance(chunk, str)) if retrieved_chunks else ""
+                    rag_time = time.time() - rag_start
+                    print(f"    🔍 LLM: RAG search: {rag_time:.3f}s ({len(retrieved_chunks)} chunks)")
+                except Exception as e:
+                    print(f"    ❌ LLM: RAG Error: {e}")
+                    retrieved_text = ""
 
         if not conversation_history and user_id:
             conversation_history = self._fetch_recent_conversation(user_id)
 
-        memory_block = "\n".join(f"{m['role'].title()}: {m['text']}" for m in conversation_history[-5:]) if conversation_history else ""
-        conversation_summary = await self.summarize_conversation(conversation_history[-5:] if conversation_history else [])
-        if conversation_summary:
-            memory_block = f"Summary:\n{conversation_summary}\n\nRecent Memory:\n{memory_block}"
-
-        try:
-            retrieved_chunks = self.retriever.search(query=user_message, top_k=2)
-            print(f"\n📚 [RAG Retrieved {len(retrieved_chunks)} documents]")
-            for idx, chunk in enumerate(retrieved_chunks, 1):
-                if isinstance(chunk, str):
-                    print(f"{idx}. {chunk[:100]}...") # Print first 100 chars
-                else:
-                    print(f"{idx}. [Unknown format]: {chunk}")
-        except Exception as e:
-            print(f"[RAG Error] {e}")
-            retrieved_chunks = []
-
-        retrieved_text = "\n\n".join(chunk for chunk in retrieved_chunks if isinstance(chunk, str)) if retrieved_chunks else ""
+        # Build memory block from provided history (already limited to 15 messages)
+        prompt_start = time.time()
+        memory_block = "\n".join(f"{m['role'].title()}: {m['text']}" for m in conversation_history[-10:]) if conversation_history else ""
+        
+        # Skip conversation summarization for performance - use direct memory
         tone_intro = self._get_varied_intro(emotion)
 
-        system_prompt = f"""
-You're a caring mental health companion for young people in Rwanda.
+        # Simplified system prompt for faster generation
+        system_prompt = f"""You're a caring mental health companion for young people in Rwanda.
 Speak with empathy, cultural sensitivity, and avoid clinical language.
-Avoid repeating past grounding exercises. Build upon the conversation.
 
 User Emotion: {emotion}
-Suicide Risk: {'Yes' if suicide_flag else 'No'}
-Medications Mentioned: {', '.join(meds_mentioned) if meds_mentioned else 'None'}
+{f"⚠️ Suicide Risk Detected" if suicide_flag else ""}
+{f"Medications: {', '.join(meds_mentioned)}" if meds_mentioned else ""}
 
 {memory_block}
 
-Knowledge (internal context):
-{retrieved_text}
+{f"Context: {retrieved_text[:500]}" if retrieved_text else ""}
 
-Start with: \"{tone_intro}\"
-Then continue with support or reflection.
-Finally, ask: {self._get_branching_followup(user_message)}
-"""
+Response: {tone_intro} {self._get_branching_followup(user_message)}"""
 
         messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_message)]
+        prompt_time = time.time() - prompt_start
+        print(f"    📝 LLM: Prompt building: {prompt_time:.3f}s ({len(system_prompt)} chars)")
+        
+        model_start = time.time()
         response = await self.chat_model.ainvoke(messages)
+        model_time = time.time() - model_start
+        print(f"    🤖 LLM: Model inference: {model_time:.3f}s")
+        
+        llm_total_time = time.time() - llm_pipeline_start
+        print(f"    ⏱️  LLM: Total pipeline: {llm_total_time:.3f}s")
+        
         return response.content.strip()

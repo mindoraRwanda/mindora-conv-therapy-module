@@ -48,6 +48,29 @@ export default function ChatList() {
     }
   };
 
+  const handleDeleteChat = async (chatId, e) => {
+    e.stopPropagation(); // Prevent navigation when clicking delete
+    
+    if (!window.confirm('Are you sure you want to delete this conversation?')) {
+      return;
+    }
+
+    try {
+      await axios.delete(`http://localhost:8000/auth/conversations/${chatId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Refresh conversation list
+      const convoRes = await axios.get('http://localhost:8000/auth/conversations', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setConversations(convoRes.data);
+    } catch (err) {
+      console.error(err);
+      setError('Could not delete the conversation.');
+    }
+  };
+
   return (
     <div className="chatlist-container">
       <style>{`
@@ -93,19 +116,43 @@ export default function ChatList() {
           margin-bottom: 10px;
         }
 
-        .chat-button {
-          padding: 10px 16px;
+        .chat-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
           background-color: white;
           border: 1px solid #cbd5e1;
           border-radius: 10px;
-          cursor: pointer;
-          width: 100%;
-          text-align: left;
           transition: background-color 0.3s;
         }
 
-        .chat-button:hover {
+        .chat-item:hover {
           background-color: #e0e7ff;
+        }
+
+        .chat-button {
+          flex: 1;
+          padding: 10px 16px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .delete-button {
+          padding: 8px 12px;
+          margin-right: 8px;
+          background-color: #dc2626;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: background-color 0.3s;
+        }
+
+        .delete-button:hover {
+          background-color: #b91c1c;
         }
 
         .no-chats {
@@ -128,12 +175,21 @@ export default function ChatList() {
       <ul className="chat-list">
         {conversations.map(chat => (
           <li key={chat.id}>
-            <button
-              className="chat-button"
-              onClick={() => navigate(`/chat/${chat.id}`)}
-            >
-              Conversation #{chat.id}
-            </button>
+            <div className="chat-item">
+              <button
+                className="chat-button"
+                onClick={() => navigate(`/chat/${chat.id}`)}
+              >
+                Conversation #{chat.id}
+              </button>
+              <button
+                className="delete-button"
+                onClick={(e) => handleDeleteChat(chat.id, e)}
+                title="Delete conversation"
+              >
+                Delete
+              </button>
+            </div>
           </li>
         ))}
       </ul>

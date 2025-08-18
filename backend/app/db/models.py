@@ -41,7 +41,7 @@ class EmotionLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    conversation_id = Column(Integer, ForeignKey("conversations.id"))
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"))
     input_text = Column(Text)
     detected_emotion = Column(String(50))
     timestamp = Column(TIMESTAMP, default=datetime.utcnow)    

@@ -378,6 +378,30 @@ export default function ChatDashboard() {
     }
   };
 
+  const handleDeleteChat = async (chatId, e) => {
+    e.stopPropagation();
+    
+    if (!window.confirm('Are you sure you want to delete this conversation?')) {
+      return;
+    }
+
+    try {
+      await axios.delete(`http://localhost:8000/auth/conversations/${chatId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // If we deleted the currently selected chat, clear selection
+      if (selectedChat?.id === chatId) {
+        setSelectedChat(null);
+        setMessages([]);
+      }
+
+      await fetchConversations();
+    } catch (err) {
+      handleError(err, 'Failed to delete conversation');
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || !selectedChat) return;
 
@@ -413,6 +437,13 @@ export default function ChatDashboard() {
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -423,108 +454,196 @@ export default function ChatDashboard() {
         .chat-dashboard {
           display: flex;
           height: 100vh;
-          font-family: sans-serif;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          background: #fafafa;
         }
         .sidebar {
-          width: 280px;
-          background: #1e3a8a;
+          width: 320px;
+          background: rgb(109, 40, 217);
           color: white;
-          padding: 20px;
+          padding: 24px;
           overflow-y: auto;
+          box-shadow: 2px 0 20px rgba(109, 40, 217, 0.15);
+          position: relative;
+        }
+        .sidebar::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+          pointer-events: none;
         }
         .sidebar h3 {
-          margin-bottom: 12px;
+          margin-bottom: 20px;
+          font-size: 22px;
+          font-weight: 700;
+          position: relative;
+          z-index: 1;
         }
         .new-chat-btn {
           width: 100%;
           margin-bottom: 20px;
-          background: transparent;
+          background: rgba(255, 255, 255, 0.2);
           color: white;
-          border: 2px solid white;
-          padding: 10px;
-          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          padding: 14px 16px;
+          border-radius: 12px;
           cursor: pointer;
-          font-weight: bold;
+          font-weight: 600;
+          font-size: 15px;
+          transition: all 0.3s ease;
+          position: relative;
+          z-index: 1;
+        }
+        .new-chat-btn:hover {
+          background: rgba(255, 255, 255, 0.3);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .chat-item-container {
+          display: flex;
+          align-items: center;
+          margin-bottom: 6px;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          overflow: hidden;
+          transition: all 0.3s ease;
+          position: relative;
+          z-index: 1;
+        }
+        .chat-item-container:hover {
+          background: rgba(255, 255, 255, 0.15);
+          transform: translateX(4px);
         }
         .chat-link {
-          display: block;
-          width: 100%;
-          padding: 10px 12px;
-          margin-bottom: 8px;
-          background: white;
-          color: #1e3a8a;
+          flex: 1;
+          padding: 14px 16px;
+          background: none;
+          color: white;
           border: none;
-          border-radius: 6px;
           text-align: left;
           cursor: pointer;
-        }
-        .chat-link:hover {
-          background: #e0e7ff;
+          font-weight: 500;
+          font-size: 14px;
+          transition: all 0.3s ease;
+          line-height: 1.4;
         }
         .chat-link.active {
-          background-color: #c7d2fe;
-          font-weight: bold;
+          background: rgba(255, 255, 255, 0.25);
+          font-weight: 600;
+        }
+        .delete-btn {
+          padding: 6px 8px;
+          margin-right: 8px;
+          background: rgba(255, 255, 255, 0.15);
+          color: rgba(255, 255, 255, 0.8);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 16px;
+          transition: all 0.3s ease;
+          min-width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .delete-btn:hover {
+          background: rgba(239, 68, 68, 0.9);
+          color: white;
+          border-color: rgba(239, 68, 68, 0.9);
+          transform: scale(1.1);
         }
         .chat-panel {
           flex: 1;
-          background: #f3f4f6;
+          background: #ffffff;
           display: flex;
           flex-direction: column;
           position: relative;
         }
         .messages {
           flex: 1;
-          padding: 20px;
+          padding: 24px;
           overflow-y: auto;
           display: flex;
           flex-direction: column;
-          gap: 12px;
-          margin-bottom: 60px;
+          gap: 16px;
+          margin-bottom: 80px;
+          background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
         }
         .message {
-          max-width: 65%;
-          padding: 12px 16px;
-          border-radius: 20px;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+          max-width: 70%;
+          padding: 16px 20px;
+          border-radius: 18px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          font-size: 15px;
+          line-height: 1.5;
         }
         .user {
           align-self: flex-end;
-          background: #1d4ed8;
+          background: rgb(109, 40, 217);
           color: white;
         }
         .bot {
           align-self: flex-start;
           background: white;
-          color: #1f2937;
+          color: #374151;
+          border: 1px solid rgba(109, 40, 217, 0.1);
         }
         .input-bar {
           position: absolute;
           bottom: 0;
           left: 0;
           right: 0;
-          padding: 10px 20px;
+          padding: 20px 24px;
           display: flex;
-          gap: 10px;
-          background: #f3f4f6;
+          gap: 12px;
+          background: white;
+          border-top: 1px solid rgba(109, 40, 217, 0.1);
         }
         .input-box {
           flex: 1;
-          padding: 14px;
-          border-radius: 30px;
-          border: 1px solid #ccc;
+          padding: 16px 20px;
+          border-radius: 24px;
+          border: 2px solid rgba(109, 40, 217, 0.2);
+          background: white;
+          font-size: 15px;
+          transition: all 0.3s ease;
+          outline: none;
+          font-family: inherit;
+          resize: none;
+          min-height: 24px;
+          max-height: 120px;
+          overflow-y: auto;
+        }
+        .input-box:focus {
+          border-color: rgb(109, 40, 217);
+          box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.1);
         }
         .send-btn {
-          padding: 14px 24px;
-          border-radius: 30px;
-          background: #1e3a8a;
+          padding: 16px 24px;
+          border-radius: 24px;
+          background: rgb(109, 40, 217);
           color: white;
-          font-weight: bold;
+          font-weight: 600;
           border: none;
           cursor: pointer;
+          transition: all 0.3s ease;
+          font-size: 15px;
+        }
+        .send-btn:hover:not(:disabled) {
+          background: rgb(91, 33, 182);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(109, 40, 217, 0.3);
         }
         .send-btn:disabled {
-          background: #9ca3af;
+          background: #d1d5db;
           cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
         }
       `}</style>
 
@@ -547,17 +666,25 @@ export default function ChatDashboard() {
         {conversations.map(chat => {
           const firstMessage = chat.messages?.find(m => m.sender === 'user')?.content;
           const label = firstMessage
-            ? firstMessage.slice(0, 25) + (firstMessage.length > 25 ? '...' : '')
-            : `Started on ${new Date(chat.started_at).toLocaleDateString()}`;
+            ? firstMessage.slice(0, 22) + (firstMessage.length > 22 ? '...' : '')
+            : `Started ${new Date(chat.started_at).toLocaleDateString()}`;
 
           return (
-            <button
-              key={chat.id}
-              onClick={() => handleSelectChat(chat)}
-              className={`chat-link ${selectedChat?.id === chat.id ? 'active' : ''}`}
-            >
-              {label}
-            </button>
+            <div key={chat.id} className="chat-item-container">
+              <button
+                onClick={() => handleSelectChat(chat)}
+                className={`chat-link ${selectedChat?.id === chat.id ? 'active' : ''}`}
+              >
+                {label}
+              </button>
+              <button
+                className="delete-btn"
+                onClick={(e) => handleDeleteChat(chat.id, e)}
+                title="Delete this conversation"
+              >
+                🗑️
+              </button>
+            </div>
           );
         })}
       </div>
@@ -589,11 +716,13 @@ export default function ChatDashboard() {
 
         {selectedChat && (
           <div className="input-bar">
-            <input
+            <textarea
               className="input-box"
               value={input}
               onChange={e => setInput(e.target.value)}
-              placeholder="Type your message..."
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
+              rows={1}
             />
             <button
               className="send-btn"
