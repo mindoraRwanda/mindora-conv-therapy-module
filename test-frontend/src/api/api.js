@@ -1,3 +1,71 @@
+// import axios from 'axios';
+
+// const API_BASE = 'http://localhost:8000';
+
+// const getAuthHeaders = () => {
+//   const token = localStorage.getItem('token');
+//   return { Authorization: `Bearer ${token}` };
+// };
+
+// // Auth
+// export const login = (email, password) =>
+//   axios.post(`${API_BASE}/auth/login`, { email, password });
+
+// export const register = (username, email, password) =>
+//   axios.post(`${API_BASE}/auth/signup`, {
+//     username,
+//     email,
+//     password,
+//   });
+
+// // Conversations
+// export const getChats = () =>
+//   axios.get(`${API_BASE}/auth/conversations`, { headers: getAuthHeaders() });
+
+// export const startNewChat = () =>
+//   axios.post(`${API_BASE}/auth/conversations`, {}, { headers: getAuthHeaders() });
+
+// // Messages
+// export const sendMessage = async (conversation_id, content) => {
+//   const res = await axios.post(
+//     'http://localhost:8000/auth/messages',
+//     { conversation_id, content },
+//     {
+//       headers: {
+//         Authorization: `Bearer ${localStorage.getItem('token')}`
+//       }
+//     }
+//   );
+
+//   return res.data; // Must include { response, emotion }
+// };
+
+
+
+// export const getMessages = (conversation_id) =>
+//   axios.get(`${API_BASE}/auth/conversations/${conversation_id}/messages`, { headers: getAuthHeaders() });
+
+// // Delete Conversation
+// export const deleteChat = (conversation_id) =>
+//   axios.delete(`${API_BASE}/auth/conversations/${conversation_id}`, {
+//     headers: getAuthHeaders(),
+//   });
+
+
+// // Context Window
+// export const fetchChatContext = async (limit = 10) => {
+//   try {
+//     const response = await axios.get(`${API_BASE}/auth/context`, {
+//       params: { limit },
+//       headers: getAuthHeaders(),
+//     });
+//     return response.data;
+//   } catch (error) {
+//     console.error('Error fetching chat context:', error);
+//     return [];
+//   }
+
+// };
 import axios from 'axios';
 
 const API_BASE = 'http://localhost:8000';
@@ -25,27 +93,29 @@ export const getChats = () =>
 export const startNewChat = () =>
   axios.post(`${API_BASE}/auth/conversations`, {}, { headers: getAuthHeaders() });
 
+export const deleteChat = (conversation_id) =>
+  axios.delete(`${API_BASE}/auth/conversations/${conversation_id}`, {
+   headers: getAuthHeaders(),
+  });
+
+
 // Messages
 export const sendMessage = async (conversation_id, content) => {
   const res = await axios.post(
-    'http://localhost:8000/auth/messages',
+    `${API_BASE}/auth/messages`,
     { conversation_id, content },
     {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      }
+      headers: getAuthHeaders(),
     }
   );
 
   return res.data; // Must include { response, emotion }
 };
 
-
-
 export const getMessages = (conversation_id) =>
-  axios.get(`${API_BASE}/auth/conversations/${conversation_id}/messages`, { headers: getAuthHeaders() });
-
-
+  axios.get(`${API_BASE}/auth/conversations/${conversation_id}/messages`, {
+    headers: getAuthHeaders(),
+  });
 
 // Context Window
 export const fetchChatContext = async (limit = 10) => {

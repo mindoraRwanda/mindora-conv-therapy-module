@@ -1,0 +1,42 @@
+models:
+  - type: main
+    engine: ollama     # change to "openai" or "vllm" if using something else
+    model: llama3      # change to your actual model name
+
+rails:
+  input:
+    - check for crisis language
+    - check for profanity
+    - check for PII
+
+  output:
+    - refuse unsafe content
+    - stay on therapeutic topics
+    - maintain empathetic tone
+
+instructions:
+  crisis_language:
+    type: keyword
+    keywords:
+      - suicide
+      - kill myself
+      - end my life
+      - harm myself
+      - kwiyahura
+      - ndashaka kwiyahura
+      - depression
+    action: trigger crisis_flow
+
+  profanity:
+    type: keyword
+    keywords:
+      - badword1
+      - badword2
+    action: block
+
+  pii:
+    type: regex
+    patterns:
+      - \b\d{10}\b # phone number
+      - \b[0-9]{16}\b # ID number
+    action: mask

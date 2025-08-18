@@ -1,8 +1,10 @@
 import torch
 from sentence_transformers import SentenceTransformer, util
 
-# Load the embedding model (self-hosted)
-model = SentenceTransformer("BAAI/bge-small-en")
+import os
+hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN")
+model = SentenceTransformer("BAAI/bge-small-en", use_auth_token=hf_token)
+
 
 # Emotion categories and example prompts
 emotion_examples = {
@@ -106,8 +108,8 @@ def classify_emotion(user_input: str) -> str:
 
     return best_label
 
-# Example usage
-if __name__ == "__main__":
-    test_input = "I can’t sleep, I keep thinking about everything that could go wrong."
-    predicted_emotion = classify_emotion(test_input)
-    print(f"Predicted Emotion: {predicted_emotion}")
+# # Example usage
+# if __name__ == "__main__":
+#     test_input = "I can’t sleep, I keep thinking about everything that could go wrong."
+#     predicted_emotion = classify_emotion(test_input)
+#     print(f"Predicted Emotion: {predicted_emotion}")

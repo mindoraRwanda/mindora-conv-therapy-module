@@ -5,6 +5,8 @@ from datetime import datetime
 
 # Import the LLM service
 from app.services.llm_service import LLMService
+from nemoguardrails import LLMRails, RailsConfig
+
 
 # Create a router
 router = APIRouter(prefix="/api", tags=["chat"])

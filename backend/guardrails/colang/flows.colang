@@ -1,0 +1,6 @@
+flow crisis_flow
+  user expresses crisis
+  bot says "It sounds like you’re going through a very difficult time. You are not alone."
+  bot says "If you are in Rwanda, please call 3511 (Rwanda Mental Health Helpline) or visit the nearest health center."
+  bot says "If you are outside Rwanda, you can find help here: https://findahelpline.com"
+  stop
