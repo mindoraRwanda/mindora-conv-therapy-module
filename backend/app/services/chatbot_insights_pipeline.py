@@ -19,7 +19,8 @@ try:
     emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", top_k=1)
     sentiment_classifier = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
     toxicity_classifier = pipeline("text-classification", model="unitary/toxic-bert")
-    disorder_classifier = pipeline("text-classification", model="mental/mental-bert-base-uncased",  use_auth_token=True)
+    # disorder_classifier = pipeline("text-classification", model="mental/mental-bert-base-uncased")  # Gated model
+    disorder_classifier = None  # Temporarily disabled due to gated model access
 except Exception as e:
     print(" Model loading error:", e)
     emotion_classifier = sentiment_classifier = toxicity_classifier = disorder_classifier = None

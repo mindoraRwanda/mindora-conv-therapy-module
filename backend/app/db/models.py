@@ -145,8 +145,9 @@ class Message(Base):
 
 class EmotionLog(Base):
     __tablename__ = "emotion_logs"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"))
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
     conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"))
     input_text = Column(Text)
     detected_emotion = Column(String(50))

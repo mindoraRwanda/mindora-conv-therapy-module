@@ -109,7 +109,14 @@ export const sendMessage = async (conversation_id, content) => {
     }
   );
 
-  return res.data; // Must include { response, emotion }
+  // Transform backend response to expected frontend format
+  return {
+    response: {
+      content: res.data.content,
+      timestamp: res.data.timestamp
+    },
+    emotion: null // Backend doesn't return emotion in message response
+  };
 };
 
 export const getMessages = (conversation_id) =>

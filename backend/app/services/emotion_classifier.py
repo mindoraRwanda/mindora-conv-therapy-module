@@ -1,10 +1,22 @@
 import torch
 from sentence_transformers import SentenceTransformer, util
 
-import os
-hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN")
-model = SentenceTransformer("BAAI/bge-small-en", use_auth_token=hf_token)
+# Configure device for GPU usage
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"SentenceTransformer using device: {device}")
 
+# Shared model cache to avoid loading multiple instances
+_model_cache = {}
+
+def get_emotion_model():
+    model_name = "BAAI/bge-small-en"
+    if model_name not in _model_cache:
+        print(f"Loading emotion model: {model_name}")
+        _model_cache[model_name] = SentenceTransformer(model_name, device=device)
+    return _model_cache[model_name]
+
+# Load the embedding model (self-hosted)
+model = get_emotion_model()
 
 # Emotion categories and example prompts
 emotion_examples = {

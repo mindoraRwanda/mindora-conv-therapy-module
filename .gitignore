@@ -29,6 +29,7 @@ pip-delete-this-directory.txt
 backend/data/conversations.json
 backend/logs/
 backend/models/
+backend/datasources/
 
 # React frontend
 test-frontend/node_modules/
@@ -46,6 +47,7 @@ test-frontend/yarn-debug.log*
 test-frontend/yarn-error.log*
 test-frontend/dist/
 test-frontend/.cache/
+node_modules/
 
 # Editor directories and files
 .idea/

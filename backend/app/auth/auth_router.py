@@ -235,7 +235,8 @@ from nemoguardrails import LLMRails, RailsConfig
 # rails = LLMRails(config)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-llm = LLMService()
+# Switch to vLLM by changing use_vllm=True
+llm = LLMService(use_vllm=False)  # Change to True to use vLLM
 
 # Dependency: get DB session
 def get_db():
@@ -282,7 +283,8 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "username": user.username
+        "user_id": user.id,
+        "username": user.username  
     }
 
 # --- Conversation Endpoints ---
@@ -372,61 +374,93 @@ async def send_message(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+    import time
+    pipeline_start = time.time()
+    print(f"\n🚀 Starting message pipeline for user {user.id}")
+    
+    # Single query to verify conversation ownership
+    db_start = time.time()
     convo = db.query(Conversation).filter_by(
         id=message.conversation_id,
         user_id=str(user.id)
     ).first()
+    db_lookup_time = time.time() - db_start
+    print(f"⏱️  DB conversation lookup: {db_lookup_time:.3f}s")
 
     if not convo:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
+    # Content cleaning
+    clean_start = time.time()
     clean_content = bleach.clean(message.content.strip())
+    clean_time = time.time() - clean_start
+    print(f"⏱️  Content cleaning: {clean_time:.3f}s")
+    
     if not clean_content:
         raise HTTPException(status_code=400, detail="Message content is empty or invalid")
 
-    # Store user message
+    # Load only recent conversation history (last 15 messages for context)
+    history_start = time.time()
+    recent_history = db.query(Message)\
+        .filter_by(conversation_id=message.conversation_id)\
+        .order_by(Message.timestamp.desc())\
+        .limit(15)\
+        .all()
+    
+    # Reverse to get chronological order
+    recent_history.reverse()
+    conversation_history = [
+        {"role": msg.sender, "text": msg.content} for msg in recent_history
+    ]
+    history_time = time.time() - history_start
+    print(f"⏱️  DB history load: {history_time:.3f}s ({len(recent_history)} messages)")
+
+    # Run emotion detection
+    emotion_start = time.time()
+    detected_emotion = classify_emotion(clean_content)
+    emotion_time = time.time() - emotion_start
+    print(f"⏱️  Emotion detection: {emotion_time:.3f}s -> {detected_emotion}")
+    
+    # Generate bot response with limited history
+    llm_start = time.time()
+    bot_reply = await llm.generate_response(clean_content, conversation_history)
+    llm_time = time.time() - llm_start
+    print(f"⏱️  LLM generation: {llm_time:.3f}s ({len(bot_reply)} chars)")
+
+    # Batch database operations - create all objects first
+    db_prep_start = time.time()
     user_msg = Message(
         conversation_id=message.conversation_id,
         sender="user",
         content=clean_content
     )
-    db.add(user_msg)
-    db.commit()
-    db.refresh(user_msg)
-
-    # Get conversation history
-    history = db.query(Message)\
-        .filter_by(conversation_id=message.conversation_id)\
-        .order_by(Message.timestamp).all()
-
-    conversation_history = [
-        {"role": msg.sender, "text": msg.content} for msg in history
-    ]
-
-    # Generate bot reply
-    bot_reply = await llm.generate_response(clean_content, conversation_history)
-    detected_emotion = classify_emotion(clean_content)
-
-    # Save emotion log
+    
+    bot_msg = Message(
+        conversation_id=message.conversation_id,
+        sender="bot",
+        content=bleach.clean(bot_reply)
+    )
+    
     emotion_log = EmotionLog(
         user_id=str(user.id),
         conversation_id=message.conversation_id,
         input_text=clean_content,
         detected_emotion=detected_emotion
     )
-    db.add(emotion_log)
 
-    # Save bot message
-    bot_msg = Message(
-        conversation_id=message.conversation_id,
-        sender="bot",
-        content=bleach.clean(bot_reply)
-    )
-    db.add(bot_msg)
-
+    # Single transaction - add all objects and commit once
+    db.add_all([user_msg, bot_msg, emotion_log])
     convo.last_activity_at = bot_msg.timestamp
     db.commit()
+    
+    # Only refresh the bot message we're returning
     db.refresh(bot_msg)
+    db_save_time = time.time() - db_prep_start
+    print(f"⏱  DB save operations: {db_save_time:.3f}s")
+    
+    total_time = time.time() - pipeline_start
+    print(f" Total pipeline time: {total_time:.3f}s")
+    print(f" Breakdown: DB({db_lookup_time + history_time + db_save_time:.3f}s) | LLM({llm_time:.3f}s) | Emotion({emotion_time:.3f}s) | Other({total_time - (db_lookup_time + history_time + db_save_time + llm_time + emotion_time):.3f}s)")
 
     return bot_msg
 
@@ -460,11 +494,27 @@ def get_context_window(
 
 # --- JWT Debug ---
 
-@router.get("/_debug/jwt")
-def debug_jwt(authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing Bearer token")
-    token = authorization.split(" ", 1)[1]
-    header = jwt.get_unverified_header(token)
-    claims = jwt.get_unverified_claims(token)
-    return {"header": header, "claims": claims}
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    conversation = db.query(Conversation)\
+        .filter_by(id=conversation_id, user_id=user.id).first()
+    
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Delete related emotion logs first to avoid foreign key constraint violation
+    db.query(EmotionLog)\
+        .filter_by(conversation_id=conversation_id)\
+        .delete()
+    
+    # Now delete the conversation (messages will be cascade deleted due to relationship config)
+    db.delete(conversation)
+    db.commit()
+    
+    return {"message": "Conversation deleted successfully"}
+
+
