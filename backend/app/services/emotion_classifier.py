@@ -119,9 +119,3 @@ def classify_emotion(user_input: str) -> str:
         return "neutral"
 
     return best_label
-
-# Example usage
-if __name__ == "__main__":
-    test_input = "I can’t sleep, I keep thinking about everything that could go wrong."
-    predicted_emotion = classify_emotion(test_input)
-    print(f"Predicted Emotion: {predicted_emotion}")
