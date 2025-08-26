@@ -183,23 +183,47 @@ class LLMService:
         }
         return choice(tone_map.get(emotion, ["I’m glad you shared that. Let’s talk through it."]))
 
-    def _get_grounding_exercise(self) -> str:
-        return (
-            "\U0001F33F Quick grounding exercise:\n"
-            "Take a deep breath in... and out.\n"
-            "Now name:\n"
-            "- 3 things you can see \n"
-            "- 2 things you can touch \n"
-            "- 1 thing you can hear \n"
-            "You're here now, and you're safe. "
-        )
+        async def _get_grounding_exercise(self, user_message: str) -> str:
+        """Ask the LLM to propose a short grounding exercise based on user’s message."""
+        grounding_prompt = PromptTemplate.from_template("""
+You are a mental health support assistant. 
+Suggest a short, gentle grounding exercise that can help the user feel calmer and present.
+Keep it practical, simple, and culturally sensitive to Rwandan youth.
+Make sure it fits the situation described by the user.
 
-    def _get_branching_followup(self, user_message: str) -> str:
-        lowered = user_message.lower()
-        if "school" in lowered: return "How have your studies been affecting your mood lately?"
-        if "family" in lowered: return "Would you like to share more about what's happening at home?"
-        if "sleep" in lowered: return "Has your sleep been restful, or do you feel tired during the day?"
-        return "Is there anything you’d like to unpack more deeply?"
+User message: {user_message}
+
+Grounding Exercise:
+""")
+        try:
+            prompt = grounding_prompt.format(user_message=user_message)
+            response = await self.chat_model.ainvoke(prompt)
+            return response.content.strip()
+        except Exception as e:
+            print(f"[Grounding Error] {e}")
+            return "Take a deep breath with me — in... and out. You're safe here."
+
+    async def _get_branching_followup(self, user_message: str) -> str:
+        """Ask the LLM to suggest a supportive follow-up question instead of keyword matching."""
+        followup_prompt = PromptTemplate.from_template("""
+You are a caring mental health assistant for young people in Rwanda. 
+The user just said:
+
+"{user_message}"
+
+Suggest one empathetic follow-up question that encourages them to share more.
+Keep it short, supportive, and conversational. Avoid clinical or diagnostic language.
+
+Follow-up question:
+""")
+        try:
+            prompt = followup_prompt.format(user_message=user_message)
+            response = await self.chat_model.ainvoke(prompt)
+            return response.content.strip()
+        except Exception as e:
+            print(f"[Followup Error] {e}")
+            return "Would you like to share a bit more about how you're feeling?"
+
 
     def _fetch_recent_conversation(self, user_id: str, limit: int = 5) -> List[Dict[str, str]]:
         try:
@@ -338,6 +362,6 @@ Response: {tone_intro} {self._get_branching_followup(user_message)}"""
             output_content = "I understand you're going through a difficult time. Let's focus on healthier ways to cope with what you're feeling. Would you like to talk about what's troubling you, or would you prefer some grounding techniques that might help?"
         
         llm_total_time = time.time() - llm_pipeline_start
-        print(f"    ⏱️  LLM: Total pipeline: {llm_total_time:.3f}s")
+        print(f"      LLM: Total pipeline: {llm_total_time:.3f}s")
         
         return output_content
