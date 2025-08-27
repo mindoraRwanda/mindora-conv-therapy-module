@@ -492,6 +492,6 @@ Respond with warmth and cultural sensitivity. Only reference what the user has a
             output_content = "I understand you're going through a difficult time. Let's focus on healthier ways to cope with what you're feeling. Would you like to talk about what's troubling you, or would you prefer some grounding techniques that might help?"
         
         llm_total_time = time.time() - llm_pipeline_start
-        print(f"    ⏱️  LLM: Total pipeline: {llm_total_time:.3f}s")
+        print(f"      LLM: Total pipeline: {llm_total_time:.3f}s")
         
         return output_content
