@@ -5,7 +5,6 @@ from langchain.schema import HumanMessage, SystemMessage
 from typing import Dict, List, Any, Optional
 import requests
 import re
-from random import choice
 from app.services.retriever_service import RetrieverService
 from app.services.emotion_classifier import classify_emotion
 from app.services.chatbot_insights_pipeline import detect_medication_mentions, detect_suicide_risk
@@ -18,22 +17,96 @@ from nemoguardrails import LLMRails, RailsConfig
 from nemoguardrails.actions import action
 
 
-# --- Intent Classifier for Guardrails ---
+# --- Rwanda-Specific Mental Health Resources ---
+class RwandaMentalHealthResources:
+    @staticmethod
+    def get_crisis_resources():
+        return {
+            "national_helpline": "114 (Rwanda Mental Health Helpline - 24/7 free)",
+            "emergency": "112 (Emergency Services)",
+            "hospitals": [
+                "Ndera Neuropsychiatric Hospital: +250 781 447 928",
+                "King Faisal Hospital: 3939 / +250 788 123 200"
+            ],
+            "community_health": "Contact your local Community Health Cooperative (CHC) or Health Center",
+            "online_support": "Rwanda Biomedical Centre Mental Health Division"
+        }
+    
+    @staticmethod
+    def get_cultural_context():
+        return {
+            "ubuntu_philosophy": "Remember 'Ubuntu' - we are interconnected. Your pain affects the community, and the community is here to support you.",
+            "family_support": "In Rwandan culture, family and community support are central to healing. Consider involving trusted family members or community leaders.",
+            "traditional_healing": "While respecting traditional healing practices, professional mental health support can work alongside cultural approaches.",
+            "resilience_history": "Rwanda has shown incredible resilience. Your personal healing contributes to our collective strength as a nation."
+        }
+
+# --- Enhanced Intent Classifier for Guardrails ---
 @action()
 async def classify_intent_with_ollama(last_user_message: str):
     lowered = last_user_message.lower().strip()
+    
+    # Enhanced self-harm detection
     crisis_keywords = [
-        "kill myself", "end my life", "suicide", "hurt myself",
-        "i want to die", "i dont want to live", "take my life",
-        "life isn’t worth", "no reason to live"
+        "kill myself", "end my life", "suicide", "hurt myself", "harm myself",
+        "i want to die", "i dont want to live", "take my life", "end it all",
+        "life isn't worth", "no reason to live", "better off dead",
+        "can't go on", "want to disappear", "nothing matters", "hopeless",
+
     ]
+    
+    # Substance abuse indicators
+    substance_keywords = [
+        "overdose", "pills", "drugs", "alcohol abuse", "drinking problem",
+        "getting high", "substance abuse", "addiction", "withdrawal"
+    ]
+    
+    # Self-injury patterns
+    self_injury_keywords = [
+        "cutting", "burning", "scratching", "hitting myself",
+        "self injury", "self harm", "hurting myself"
+    ]
+    
+    # Check for crisis situations
     for kw in crisis_keywords:
         if kw in lowered:
             return "self_harm"
-    if any(k in lowered for k in ["hack", "wifi", "bomb", "drugs", "weapon"]):
+    
+    for kw in substance_keywords:
+        if kw in lowered:
+            return "substance_abuse"
+            
+    for kw in self_injury_keywords:
+        if kw in lowered:
+            return "self_injury"
+    
+    # Enhanced illegal content detection
+    if any(k in lowered for k in ["hack", "bomb", "weapon", "violence", "revenge"]):
         return "illegal"
-    if any(k in lowered for k in ["ignore instructions", "jailbreak", "pretend to be"]):
+    
+    # Enhanced jailbreak detection
+    if any(k in lowered for k in ["ignore instructions", "jailbreak", "pretend to be", "roleplay as", "act as if"]):
         return "jailbreak"
+    
+    # Inappropriate relationship boundaries
+    if any(k in lowered for k in ["romantic", "dating", "love you", "marry me", "kiss"]):
+        return "inappropriate_relationship"
+    
+    # Medical advice seeking
+    if any(k in lowered for k in ["diagnose", "medication dosage", "stop taking", "medical advice"]):
+        return "medical_advice"
+    
+    # Off-topic requests (non-mental health) - simple boundary check
+    mental_health_indicators = [
+        "feel", "sad", "happy", "angry", "anxious", "stressed", "depressed", "worried",
+        "help", "support", "talk", "problem", "difficult", "struggle", "emotion",
+        "mental health", "therapy", "counseling", "coping"
+    ]
+    
+    # If message is long and contains no mental health indicators, likely off-topic
+    if len(lowered) > 30 and not any(indicator in lowered for indicator in mental_health_indicators):
+        return "off_topic"
+    
     return "general"
 
 class LLMService:
@@ -77,27 +150,39 @@ class LLMService:
             print(f"Error during model initialization: {e}")
 
     def _initialize_guardrails(self):
-        flows_config = """
+        rwanda_resources = RwandaMentalHealthResources()
+        crisis_resources = rwanda_resources.get_crisis_resources()
+        cultural_context = rwanda_resources.get_cultural_context()
+        
+        flows_config = f"""
         colang: |
-          flow block_illegal
+          flow safety_and_boundary_check
             user ".*"
             call classify_intent_with_ollama $last_user_message
-            if $result == "illegal":
-              bot "I can't help with that. I'm here only to support mental health and well-being."
-              stop
-
-          flow block_jailbreak
-            user ".*"
-            call classify_intent_with_ollama $last_user_message
-            if $result == "jailbreak":
-              bot "I can't override my safety instructions. I'm here only to support mental health and your well-being."
-              stop
-
-          flow handle_self_harm
-            user ".*"
-            call classify_intent_with_ollama $last_user_message
+            
             if $result == "self_harm":
-              bot "I'm really concerned about what you're going through. You don't have to face this alone. Please reach out to a mental health professional or crisis helpline immediately. In Rwanda, you can contact: Rwanda Mental Health Helpline: 114 or Emergency: 112. I'm here to support you, but professional help is what you need right now."
+              bot "I'm deeply concerned about what you're sharing. Your life has value and you don't have to face this alone. Please reach out for immediate professional help: {crisis_resources['national_helpline']}, Emergency: {crisis_resources['emergency']}, or visit {crisis_resources['hospitals'][0]}. {cultural_context['ubuntu_philosophy']} I'm here to support you, but professional crisis support is essential right now."
+              stop
+            elif $result == "substance_abuse":
+              bot "I understand you're dealing with substance-related concerns. This is a serious matter that needs professional support. Please contact: {crisis_resources['national_helpline']} for mental health and addiction support, or visit your nearest health center. {cultural_context['family_support']} Professional treatment combined with community support can make a real difference."
+              stop
+            elif $result == "self_injury":
+              bot "I'm concerned about the self-harm you're describing. These feelings are valid, but hurting yourself isn't the solution. Please reach out: {crisis_resources['national_helpline']} or {crisis_resources['emergency']} for immediate support. {cultural_context['traditional_healing']} Let's work together on healthier ways to manage these difficult emotions."
+              stop
+            elif $result == "illegal":
+              bot "I can't help with that. I'm here only to support mental health and well-being in a safe, constructive way."
+              stop
+            elif $result == "jailbreak":
+              bot "I can't override my safety instructions. I'm here only to support mental health and your well-being. Let's focus on how I can help you today."
+              stop
+            elif $result == "inappropriate_relationship":
+              bot "I'm here as a supportive mental health companion, not for romantic or personal relationships. Let's keep our conversation focused on supporting your well-being and mental health. How can I help you today?"
+              stop
+            elif $result == "medical_advice":
+              bot "I can't provide medical diagnosis or medication advice. For medical concerns, please consult qualified healthcare providers at: {crisis_resources['hospitals'][0]}, {crisis_resources['hospitals'][1]}, or your local health center. {crisis_resources['community_health']} I can offer emotional support and coping strategies while you seek professional medical care."
+              stop
+            elif $result == "off_topic":
+              bot "I'm a mental health companion designed specifically to support your emotional well-being and mental health. While I'd love to help with other topics, my expertise is in providing mental health support, coping strategies, and connecting you with resources in Rwanda. Is there anything related to your mental health or well-being I can help you with today?"
               stop
         """
         try:
@@ -174,69 +259,99 @@ class LLMService:
                 return False
         return True
 
-    def _get_varied_intro(self, emotion: str) -> str:
-        tone_map = {
-            "sadness": ["That sounds heavy. Thanks for sharing."],
-            "anxiety": ["Let’s slow down together. You’re safe here."],
-            "stress": ["Sounds like a lot’s on your plate. I get it."],
-            "neutral": ["Let’s explore this together."]
+    def _get_contextual_response_approach(self, emotion: str, user_message: str, conversation_context: List[Dict[str, str]]) -> Dict[str, str]:
+        """Generate contextually appropriate response approach based on emotion, message content, and conversation history"""
+        lowered = user_message.lower()
+        
+        
+        # Rwanda-specific cultural considerations
+        cultural_elements = RwandaMentalHealthResources.get_cultural_context()
+        
+        approach = {
+            "tone": "empathetic",
+            "cultural_element": "",
+            "validation": "",
+            "exploration_question": "",
+            "support_offering": ""
         }
-        return choice(tone_map.get(emotion, ["I’m glad you shared that. Let’s talk through it."]))
+        
+        # Emotion-specific approaches with cultural integration
+        if emotion == "sadness":
+            approach.update({
+                "tone": "gentle_presence",
+                "cultural_element": cultural_elements["ubuntu_philosophy"],
+                "validation": "Your sadness is valid, and it's brave of you to share these feelings.",
+                "exploration_question": "What's weighing most heavily on your heart right now?",
+                "support_offering": "I'm here to listen and walk through this with you."
+            })
+        elif emotion == "anxiety":
+            approach.update({
+                "tone": "calming_reassurance",
+                "cultural_element": cultural_elements["resilience_history"],
+                "validation": "Anxiety can feel overwhelming, but you're not alone in this experience.",
+                "exploration_question": "What thoughts or situations are contributing to this anxious feeling?",
+                "support_offering": "Let's explore some grounding techniques that might help."
+            })
+        elif emotion == "stress":
+            approach.update({
+                "tone": "understanding_support",
+                "cultural_element": cultural_elements["family_support"],
+                "validation": "It sounds like you're carrying a heavy load right now.",
+                "exploration_question": "What aspect of this stress feels most urgent to address?",
+                "support_offering": "We can break this down into manageable pieces together."
+            })
+        else:  # neutral or other emotions
+            approach.update({
+                "validation": "Thank you for sharing what's on your mind.",
+                "exploration_question": "What would be most helpful for us to focus on today?",
+                "support_offering": "I'm here to support you in whatever way feels right."
+            })
+        
+        # Contextual topic-specific adjustments
+        if "school" in lowered or "university" in lowered:
+            approach["exploration_question"] = "How are your studies affecting your overall well-being?"
+        elif "family" in lowered:
+            approach["cultural_element"] = cultural_elements["family_support"]
+            approach["exploration_question"] = "Family relationships can be complex. What's happening that you'd like to talk about?"
+        elif "work" in lowered or "job" in lowered:
+            approach["exploration_question"] = "How is your work situation impacting your mental health?"
+        
+        return approach
 
-    def _get_grounding_exercise(self) -> str:
+    def _get_rwanda_appropriate_grounding(self) -> str:
+        """Rwanda-culturally appropriate grounding exercise"""
         return (
-            "\U0001F33F Quick grounding exercise:\n"
-            "Take a deep breath in... and out.\n"
-            "Now name:\n"
-            "- 3 things you can see \n"
-            "- 2 things you can touch \n"
-            "- 1 thing you can hear \n"
-            "You're here now, and you're safe. "
+            "🌿 Let's ground ourselves together:\n"
+            "Breathe slowly... in through your nose, out through your mouth.\n"
+            "Now, notice your surroundings:\n"
+            "- 3 things you can see around you\n"
+            "- 2 sounds you can hear (maybe birds, voices, or wind)\n" 
+            "- 1 thing you can feel (your feet on the ground, air on your skin)\n"
+            "Remember: You are here, you are present, and you belong to this community. "
         )
 
-    def _get_branching_followup(self, user_message: str) -> str:
-        lowered = user_message.lower()
-        if "school" in lowered: return "How have your studies been affecting your mood lately?"
-        if "family" in lowered: return "Would you like to share more about what's happening at home?"
-        if "sleep" in lowered: return "Has your sleep been restful, or do you feel tired during the day?"
-        return "Is there anything you’d like to unpack more deeply?"
-
-    def _fetch_recent_conversation(self, user_id: str, limit: int = 5) -> List[Dict[str, str]]:
+    def _fetch_recent_conversation(self, user_id: str, limit: int = 15) -> List[Dict[str, str]]:
+        """Fetch recent conversation history with enhanced context"""
         try:
             db: Session = next(get_db())
             convo = db.query(Conversation).filter_by(user_id=user_id).order_by(Conversation.last_activity_at.desc()).first()
             if not convo: return []
+            
+            # Get more messages for better context (increased from 5 to 15)
             messages = db.query(Message).filter_by(conversation_id=convo.id).order_by(Message.timestamp.desc()).limit(limit).all()
-            return [{"role": m.sender, "text": m.content} for m in reversed(messages)]
+            conversation_messages = [{"role": m.sender, "text": m.content, "timestamp": m.timestamp} for m in reversed(messages)]
+            
+            # Filter out very short or system messages for better context quality
+            meaningful_messages = []
+            for msg in conversation_messages:
+                if len(msg["text"].strip()) >= 3:  # Keep messages with meaningful content
+                    meaningful_messages.append({"role": msg["role"], "text": msg["text"]})
+            
+            return meaningful_messages
         except Exception as e:
             print(f"[DB Error] {e}")
             return []
 
-    async def summarize_conversation(self, messages: List[Dict[str, str]]) -> str:
-        if not messages:
-            return ""
-
-        filtered = [msg for msg in messages if msg["role"] == "user"]
-        if messages and messages[-1]["role"] == "assistant":
-            filtered.append(messages[-1])
-
-        chat_log = "\n".join(f"{msg['role'].capitalize()}: {msg['text']}" for msg in filtered)
-
-        summary_prompt = PromptTemplate.from_template("""
-Summarize this mental health chat between a young person and a supportive assistant. Focus on emotional themes, needs, and main ideas. Avoid repeating grounding exercises or bot phrases.
-
-{chat_log}
-
-Summary:
-""")
-
-        try:
-            prompt = summary_prompt.format(chat_log=chat_log)
-            response = await self.chat_model.ainvoke(prompt)
-            return response.content.strip()
-        except Exception as e:
-            print(f"[Summarization Error] {e}")
-            return ""
 
     async def generate_response(self, user_message: str, conversation_history: Optional[List[Dict[str, Any]]] = None, user_id: Optional[str] = None, skip_analysis: bool = False) -> str:
         import time
@@ -283,14 +398,18 @@ Summary:
             analysis_time = time.time() - analysis_start
             print(f"    📊 LLM: Analysis pipeline: {analysis_time:.3f}s")
 
-            # Skip RAG for very short messages or greetings
-            if len(user_message.strip()) < 20 or any(greeting in user_message.lower() for greeting in ['hi', 'hello', 'hey', 'good morning', 'good evening']):
+            # RAG decision logic - skip only for very basic interactions
+            simple_greetings = ['hi', 'hello', 'hey', 'good morning', 'good evening', 'how are you']
+            is_simple_greeting = len(user_message.strip()) < 15 and any(greeting in user_message.lower() for greeting in simple_greetings)
+            
+            if is_simple_greeting:
                 retrieved_text = ""
-                print(f"    🚫 LLM: Skipping RAG (short/greeting)")
+                print(f"    🚫 LLM: Skipping RAG (simple greeting)")
             else:
                 rag_start = time.time()
                 try:
-                    retrieved_chunks = self.retriever.search(query=user_message, top_k=2)
+                    # Increase RAG results for better context (from 2 to 3)
+                    retrieved_chunks = self.retriever.search(query=user_message, top_k=3)
                     retrieved_text = "\n\n".join(chunk for chunk in retrieved_chunks if isinstance(chunk, str)) if retrieved_chunks else ""
                     rag_time = time.time() - rag_start
                     print(f"    🔍 LLM: RAG search: {rag_time:.3f}s ({len(retrieved_chunks)} chunks)")
@@ -301,26 +420,61 @@ Summary:
         if not conversation_history and user_id:
             conversation_history = self._fetch_recent_conversation(user_id)
 
-        # Build memory block from provided history (already limited to 15 messages)
+        # Enhanced context building and response approach
         prompt_start = time.time()
-        memory_block = "\n".join(f"{m['role'].title()}: {m['text']}" for m in conversation_history[-10:]) if conversation_history else ""
         
-        # Skip conversation summarization for performance - use direct memory
-        tone_intro = self._get_varied_intro(emotion)
+        # Build richer memory block with more context (up to 15 messages for better continuity)
+        memory_block = ""
+        if conversation_history:
+            recent_messages = conversation_history[-15:]  # Increased from 10 to 15
+            memory_block = "\n".join(f"{m['role'].title()}: {m['text']}" for m in recent_messages)
+        
+        # Get contextual response approach
+        response_approach = self._get_contextual_response_approach(emotion, user_message, conversation_history)
+        
+        # Rwanda-specific cultural and resource context
+        rwanda_resources = RwandaMentalHealthResources()
+        cultural_context = rwanda_resources.get_cultural_context()
+        crisis_resources = rwanda_resources.get_crisis_resources()
+        
+        # Build contextual system prompt - avoid hallucination
+        context_parts = []
+        
+        if memory_block.strip():
+            context_parts.append(f"Previous conversation context:\n{memory_block}")
+        else:
+            context_parts.append("This appears to be a new conversation.")
+            
+        if suicide_flag:
+            context_parts.append("⚠️ CRISIS INDICATOR: Suicide risk detected - prioritize safety and professional referral")
+            
+        if meds_mentioned:
+            context_parts.append(f"📋 Medications mentioned: {', '.join(meds_mentioned)} - be mindful of medication safety")
+            
+        if retrieved_text:
+            context_parts.append(f"Relevant knowledge: {retrieved_text[:500]}")
 
-        # Simplified system prompt for faster generation
-        system_prompt = f"""You're a caring mental health companion for young people in Rwanda.
-Speak with empathy, cultural sensitivity, and avoid clinical language.
+        system_prompt = f"""You are a compassionate mental health companion for young people in Rwanda. 
+        You only use the English language.
 
-User Emotion: {emotion}
-{f"⚠️ Suicide Risk Detected" if suicide_flag else ""}
-{f"Medications: {', '.join(meds_mentioned)}" if meds_mentioned else ""}
+Key principles:
+- Ubuntu philosophy: "I am because we are" - emphasize community support
+- Respect Rwandan culture and family-centered healing
+- Provide emotional support, not medical diagnosis
+- Connect to local resources when needed
 
-{memory_block}
+Current context:
+{chr(10).join(context_parts)}
 
-{f"Context: {retrieved_text[:500]}" if retrieved_text else ""}
+User's emotional state: {emotion}
+Response approach: {response_approach['validation']} {response_approach['support_offering']}
 
-Response: {tone_intro} {self._get_branching_followup(user_message)}"""
+Available resources:
+- Crisis: {crisis_resources['national_helpline']} 
+- Emergency: {crisis_resources['emergency']}
+- Local health centers available
+
+Respond with warmth and cultural sensitivity. Only reference what the user has actually shared - never invent conversation history."""
 
         messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_message)]
         prompt_time = time.time() - prompt_start
