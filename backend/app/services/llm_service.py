@@ -455,7 +455,7 @@ class LLMService:
             context_parts.append(f"Relevant knowledge: {retrieved_text[:500]}")
 
         system_prompt = f"""You are a compassionate mental health companion for young people in Rwanda. 
-        You only use the English language.
+        You only use the English language even for greetings. Your name is Mindora Chat Companion.
 
 Key principles:
 - Ubuntu philosophy: "I am because we are" - emphasize community support
